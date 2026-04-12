@@ -1,30 +1,31 @@
-import { Controller, Post, UseInterceptors, UploadedFile, BadRequestException } from '@nestjs/common';
+// files.controller.ts
+import { Controller, Post, UploadedFile, UseInterceptors, Get, Param, Res } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
-import { extname } from 'path';
+import { FilesService } from '../services/files.service';
 
 @Controller('files')
 export class FilesController {
-  
+  constructor(private readonly filesService: FilesService) {}
+
   @Post('upload')
   @UseInterceptors(FileInterceptor('file', {
     storage: diskStorage({
-      destination: './static/uploads', 
-      filename: (req, file, callback) => {
-        const uniqueName = Date.now() + '-' + Math.round(Math.random() * 1e9);
-        callback(null, `${uniqueName}${extname(file.originalname)}`);
+      destination: './static/uploads',
+      filename: (req, file, cb) => {
+        const fileExtension = file.mimetype.split('/')[1];
+        const fileName = `${Date.now()}.${fileExtension}`; // Evita duplicados
+        cb(null, fileName);
       }
-    }),
-    fileFilter: (req, file, callback) => {
-      if (!file.originalname.match(/\.(jpg|jpeg|png|pdf)$/)) {
-        return callback(new BadRequestException('Solo se admiten imágenes o PDFs'), false);
-      }
-      callback(null, true);
-    }
+    })
   }))
   uploadFile(@UploadedFile() file: Express.Multer.File) {
-    return {
-      url: `http://localhost:3000/static/uploads/${file.filename}`
-    };
+    return { fileName: file.filename };
+  }
+
+  @Get(':name')
+  findFile(@Param('name') name: string, @Res() res) {
+    const path = this.filesService.getStaticFilePath(name);
+    res.sendFile(path);
   }
 }
